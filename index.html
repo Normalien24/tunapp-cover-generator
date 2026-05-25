@@ -261,12 +261,13 @@
 <script>
 const BG_COLORS = ['#2976bb', '#4dc9aa', '#e93a5a', '#de683e', '#52b3eb', '#1a1f2b'];
 
-// Deteksi environment: HTTPS (GitHub Pages) vs file://  (local dev)
-const IS_HTTPS  = window.location.protocol.startsWith('https');
-const IS_FILE   = window.location.protocol === 'file:';
+// Render 2x agar hasil download HD (1480×960), ditampilkan di UI setengahnya (740×480)
+const SCALE = 2;
 
-// HTTPS → CDN dengan crossOrigin (toDataURL berfungsi penuh)
-// file:// → CDN tanpa crossOrigin (canvas display saja, save via klik kanan)
+const IS_HTTPS = window.location.protocol.startsWith('https');
+
+// HTTPS → crossOrigin aktif → canvas tidak tainted → download berfungsi penuh
+// file:// → tanpa crossOrigin → preview bisa, download via klik kanan
 const APPLE_CDN   = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/';
 const TWEMOJI_CDN = 'https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/72x72/';
 
@@ -330,37 +331,50 @@ async function getEmojiImg(emoji) {
     return null;
 }
 
-/* ── Layout ── */
+/* ── Layout (ukuran logical, akan di-scale di canvas) ── */
 function getLayout(n) {
     if (n === 1) return { size: 220, gap: 0 };
     if (n === 2) return { size: 200, gap: 60 };
     return { size: 155, gap: 35 };
 }
 
-/* ── Canvas builder ── */
+/* ── Canvas builder — render di 2x untuk HD ── */
 async function buildCanvas(title, bgColor) {
-    const W = 740, H = 480;
+    // Canvas fisik 2x dari ukuran target (1480×960)
+    // Ditampilkan di UI via CSS width:100% → terlihat 740×480
+    // Download menghasilkan PNG 1480×960 yang jauh lebih tajam
+    const W = 740 * SCALE;
+    const H = 480 * SCALE;
+
     const canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    const ctx    = canvas.getContext('2d');
+    canvas.width  = W;
+    canvas.height = H;
+
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, W, H);
 
     const emojiChars = extractEmojiChars(title);
     if (!emojiChars.length) {
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = 'bold 15px system-ui';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle    = 'rgba(255,255,255,0.3)';
+        ctx.font         = `bold ${15 * SCALE}px system-ui`;
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('(tidak ada emoji terdeteksi)', W / 2, H / 2);
         return canvas;
     }
 
     const n = emojiChars.length;
-    const { size, gap } = getLayout(n);
+    const layout = getLayout(n);
+    // Scale semua ukuran sesuai SCALE
+    const size   = layout.size * SCALE;
+    const gap    = layout.gap  * SCALE;
     const totalW = n * size + (n - 1) * gap;
-    const x0 = Math.round((W - totalW) / 2);
-    const y0 = Math.round((H - size) / 2);
+    const x0     = Math.round((W - totalW) / 2);
+    const y0     = Math.round((H - size)   / 2);
 
     const imgs = await Promise.all(emojiChars.map(getEmojiImg));
 
@@ -369,10 +383,10 @@ async function buildCanvas(title, bgColor) {
         if (imgs[i]) {
             ctx.drawImage(imgs[i], x, y0, size, size);
         } else {
-            // Fallback: system emoji font
             ctx.save();
-            ctx.font = `${Math.round(size * 0.82)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",emoji`;
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.font         = `${Math.round(size * 0.82)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",emoji`;
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
             ctx.fillText(emojiChars[i], x + size / 2, y0 + size / 2);
             ctx.restore();
         }
