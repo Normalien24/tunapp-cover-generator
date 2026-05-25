@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunapp Cover Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f1117;
+            color: #fff;
+            min-height: 100vh;
+            padding: 40px 20px 80px;
+        }
+
+        .container { max-width: 980px; margin: 0 auto; }
+
+        .header { margin-bottom: 32px; }
+        .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
+        .header p  { color: #5a6b7e; margin-top: 5px; font-size: 14px; }
+
+        .color-strip {
+            display: flex;
+            gap: 6px;
+            margin-top: 14px;
+            align-items: center;
+        }
+        .color-dot {
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .color-strip span { font-size: 11px; color: #364455; margin-left: 4px; }
+
+        .card {
+            background: #151b27;
+            border: 1px solid #222d3d;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 28px;
+        }
+
+        label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: #5a6b7e;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 190px;
+            background: #0d1118;
+            border: 1px solid #222d3d;
+            border-radius: 10px;
+            color: #dde4f0;
+            font-size: 14px;
+            line-height: 1.75;
+            padding: 14px 16px;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        textarea:focus { outline: none; border-color: #2976bb; }
+        textarea::placeholder { color: #2a3545; }
+
+        .controls-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 16px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .select-group { flex: 1; min-width: 200px; }
+
+        select {
+            width: 100%;
+            background: #0d1118;
+            border: 1px solid #222d3d;
+            border-radius: 10px;
+            color: #dde4f0;
+            padding: 11px 13px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        select:focus { outline: none; border-color: #2976bb; }
+
+        .btn-generate {
+            background: #2976bb;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 26px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap;
+        }
+        .btn-generate:hover  { background: #1d65a8; }
+        .btn-generate:active { transform: scale(0.97); }
+        .btn-generate:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+        .progress-wrap {
+            background: #0d1118;
+            border-radius: 8px;
+            height: 5px;
+            margin-top: 16px;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #2976bb, #4dc9aa);
+            border-radius: 8px;
+            width: 0%;
+            transition: width 0.25s ease;
+        }
+
+        .status { font-size: 13px; color: #4dc9aa; margin-top: 10px; min-height: 19px; }
+        .status.error { color: #e93a5a; }
+
+        #output-section { display: none; }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .output-title { font-size: 15px; font-weight: 700; }
+
+        .btn-dl-all {
+            background: transparent;
+            border: 1px solid #222d3d;
+            color: #5a6b7e;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .btn-dl-all:hover { border-color: #4dc9aa; color: #4dc9aa; }
+
+        .covers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
+            gap: 18px;
+        }
+
+        .cover-card {
+            background: #151b27;
+            border: 1px solid #222d3d;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .cover-card canvas { width: 100%; display: block; }
+
+        .cover-footer {
+            padding: 11px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cover-meta { overflow: hidden; }
+        .cover-num  { font-size: 11px; font-weight: 700; color: #4dc9aa; letter-spacing: 0.4px; }
+        .cover-name {
+            font-size: 12px; color: #5a6b7e;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 240px; display: block; margin-top: 2px;
+        }
+
+        .btn-dl {
+            background: #1c2a3e;
+            color: #6eb5e8;
+            border: 1px solid #264060;
+            border-radius: 7px;
+            padding: 7px 13px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .btn-dl:hover { background: #2976bb; color: #fff; border-color: #2976bb; }
+
+        .color-badge {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <h1>Tunapp Blog Cover Generator</h1>
+        <p>Generate iOS-emoji covers · 740 × 480 px · Paste judul dengan emoji di akhir</p>
+        <div class="color-strip">
+            <div class="color-dot" style="background:#2976bb" title="#2976bb"></div>
+            <div class="color-dot" style="background:#4dc9aa" title="#4dc9aa"></div>
+            <div class="color-dot" style="background:#e93a5a" title="#e93a5a"></div>
+            <div class="color-dot" style="background:#de683e" title="#de683e"></div>
+            <div class="color-dot" style="background:#52b3eb" title="#52b3eb"></div>
+            <div class="color-dot" style="background:#1a1f2b;border-color:rgba(255,255,255,0.15)" title="#1a1f2b"></div>
+            <span>urutan background, berulang tiap 6</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>Paste judul blog (satu per baris · emoji di akhir judul)</label>
+        <textarea id="input" placeholder="Contoh:&#10;146. Armenian and the Diaspora: Language as Identity and Survival 🌍🧬&#10;147. Learning Armenian at Home: Tips for Busy Families 📚✨&#10;148. Music in Armenian Culture: Songs That Survived Centuries 🏛️🎶"></textarea>
+
+        <div class="controls-row">
+            <div class="select-group">
+                <label>Mulai dari warna ke-</label>
+                <select id="color-offset">
+                    <option value="0">1 — #2976bb · Biru</option>
+                    <option value="1">2 — #4dc9aa · Teal</option>
+                    <option value="2">3 — #e93a5a · Merah</option>
+                    <option value="3">4 — #de683e · Oranye</option>
+                    <option value="4">5 — #52b3eb · Biru Muda</option>
+                    <option value="5">6 — #1a1f2b · Gelap</option>
+                </select>
+            </div>
+            <button class="btn-generate" id="gen-btn" onclick="generate()">Generate Covers</button>
+        </div>
+
+        <div class="progress-wrap" id="prog-wrap">
+            <div class="progress-bar" id="prog-bar"></div>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <div id="output-section">
+        <div class="output-header">
+            <span class="output-title" id="output-title"></span>
+            <button class="btn-dl-all" onclick="downloadAll()">⬇ Download Semua</button>
+        </div>
+        <div class="covers-grid" id="covers"></div>
+    </div>
+
+</div>
+<script>
+const BG_COLORS = ['#2976bb', '#4dc9aa', '#e93a5a', '#de683e', '#52b3eb', '#1a1f2b'];
+
+// Deteksi environment: HTTPS (GitHub Pages) vs file://  (local dev)
+const IS_HTTPS  = window.location.protocol.startsWith('https');
+const IS_FILE   = window.location.protocol === 'file:';
+
+// HTTPS → CDN dengan crossOrigin (toDataURL berfungsi penuh)
+// file:// → CDN tanpa crossOrigin (canvas display saja, save via klik kanan)
+const APPLE_CDN   = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/';
+const TWEMOJI_CDN = 'https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/72x72/';
+
+let generatedCovers = [];
+
+/* ── Emoji extraction ── */
+function extractEmojiChars(text) {
+    const results = [];
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+        const seg = new Intl.Segmenter('und', { granularity: 'grapheme' });
+        for (const { segment } of seg.segment(text)) {
+            if (isEmojiCluster(segment)) results.push(segment);
+        }
+        return results;
+    }
+    const re = /\p{Regional_Indicator}{2}|\p{Extended_Pictographic}(?:️)?(?:‍\p{Extended_Pictographic}(?:️)?)*|\p{Emoji_Presentation}/gu;
+    return (text.match(re) || []).filter(e => !/^\d$/.test(e));
+}
+
+function isEmojiCluster(seg) {
+    if (/^\d$/.test(seg)) return false;
+    return /\p{Extended_Pictographic}|\p{Emoji_Presentation}/u.test(seg);
+}
+
+/* ── Codepoint path (lowercase, sesuai format emoji-datasource-apple) ── */
+function emojiToPath(emoji) {
+    return [...emoji].map(c => c.codePointAt(0).toString(16)).join('-');
+}
+
+/* ── Image loader ── */
+function loadImg(url, cors = false) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        if (cors) img.crossOrigin = 'anonymous';
+        img.onload  = () => resolve(img);
+        img.onerror = () => reject();
+        img.src     = url;
+    });
+}
+
+async function getEmojiImg(emoji) {
+    const path  = emojiToPath(emoji);
+    const noVar = path.replace(/-fe0f/g, '');
+
+    // Dari HTTPS: pakai crossOrigin agar canvas tidak tainted → download berfungsi
+    // Dari file://: tanpa crossOrigin agar gambar bisa load
+    const cors = IS_HTTPS;
+
+    const candidates = [
+        APPLE_CDN   + path   + '.png',
+        ...(noVar !== path ? [APPLE_CDN + noVar + '.png'] : []),
+        TWEMOJI_CDN + path   + '.png',
+        ...(noVar !== path ? [TWEMOJI_CDN + noVar + '.png'] : []),
+    ];
+
+    for (const url of candidates) {
+        try { return await loadImg(url, cors); } catch {}
+    }
+
+    // Final fallback: system font (Segoe UI Emoji / Apple Color Emoji)
+    return null;
+}
+
+/* ── Layout ── */
+function getLayout(n) {
+    if (n === 1) return { size: 220, gap: 0 };
+    if (n === 2) return { size: 200, gap: 60 };
+    return { size: 155, gap: 35 };
+}
+
+/* ── Canvas builder ── */
+async function buildCanvas(title, bgColor) {
+    const W = 740, H = 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx    = canvas.getContext('2d');
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, W, H);
+
+    const emojiChars = extractEmojiChars(title);
+    if (!emojiChars.length) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = 'bold 15px system-ui';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('(tidak ada emoji terdeteksi)', W / 2, H / 2);
+        return canvas;
+    }
+
+    const n = emojiChars.length;
+    const { size, gap } = getLayout(n);
+    const totalW = n * size + (n - 1) * gap;
+    const x0 = Math.round((W - totalW) / 2);
+    const y0 = Math.round((H - size) / 2);
+
+    const imgs = await Promise.all(emojiChars.map(getEmojiImg));
+
+    for (let i = 0; i < n; i++) {
+        const x = x0 + i * (size + gap);
+        if (imgs[i]) {
+            ctx.drawImage(imgs[i], x, y0, size, size);
+        } else {
+            // Fallback: system emoji font
+            ctx.save();
+            ctx.font = `${Math.round(size * 0.82)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",emoji`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(emojiChars[i], x + size / 2, y0 + size / 2);
+            ctx.restore();
+        }
+    }
+    return canvas;
+}
+
+/* ── Download ── */
+function downloadCanvas(canvas, filename) {
+    try {
+        const a = document.createElement('a');
+        a.download = filename;
+        a.href     = canvas.toDataURL('image/png');
+        a.click();
+        return true;
+    } catch (e) {
+        if (e.name === 'SecurityError') {
+            alert('Klik kanan pada gambar → Save image as… untuk menyimpan.\n\nAtau buka halaman ini melalui HTTPS (GitHub Pages) untuk download otomatis.');
+        }
+        return false;
+    }
+}
+
+/* ── Helpers ── */
+function extractBlogNum(title) {
+    const m = title.match(/^(\d+)\./);
+    return m ? parseInt(m[1]) : null;
+}
+
+function getPlainTitle(title) {
+    const emojis = extractEmojiChars(title);
+    let plain    = title.replace(/^\d+\.\s*/, '');
+    for (const e of emojis) plain = plain.split(e).join('');
+    return plain.trim();
+}
+
+function setStatus(msg, isErr = false) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className   = 'status' + (isErr ? ' error' : '');
+}
+
+function setProgress(pct) {
+    document.getElementById('prog-wrap').style.display = pct > 0 ? 'block' : 'none';
+    document.getElementById('prog-bar').style.width    = pct + '%';
+}
+
+/* ── Main ── */
+async function generate() {
+    const raw = document.getElementById('input').value.trim();
+    if (!raw) return;
+
+    const titles = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!titles.length) return;
+
+    const offset = parseInt(document.getElementById('color-offset').value);
+    const btn    = document.getElementById('gen-btn');
+
+    btn.disabled = true;
+    generatedCovers = [];
+    document.getElementById('covers').innerHTML             = '';
+    document.getElementById('output-section').style.display = 'none';
+    setProgress(1);
+
+    for (let i = 0; i < titles.length; i++) {
+        const title        = titles[i];
+        const colorIdx     = (i + offset) % BG_COLORS.length;
+        const bgColor      = BG_COLORS[colorIdx];
+        const blogNum      = extractBlogNum(title) ?? (i + 1);
+        const plainTitle   = getPlainTitle(title);
+        const detectedEmoji = extractEmojiChars(title);
+        const fileNum      = String(blogNum).padStart(3, '0');
+        const filename     = `tunapp_cover_${fileNum}.png`;
+
+        setStatus(`Membuat cover ${i + 1}/${titles.length}…  ${detectedEmoji.join(' ')}`);
+
+        const canvas = await buildCanvas(title, bgColor);
+        generatedCovers.push({ canvas, filename, blogNum, plainTitle, bgColor });
+
+        // Card
+        const card    = document.createElement('div');
+        card.className = 'cover-card';
+        canvas.title   = 'Klik kanan → Save image as…';
+        card.appendChild(canvas);
+
+        const footer = document.createElement('div');
+        footer.className = 'cover-footer';
+
+        const meta = document.createElement('div');
+        meta.className = 'cover-meta';
+
+        const numEl = document.createElement('span');
+        numEl.className = 'cover-num';
+        numEl.innerHTML = `<span class="color-badge" style="background:${bgColor}"></span>Cover ${blogNum}&nbsp;&nbsp;${detectedEmoji.join(' ')}`;
+
+        const nameEl = document.createElement('span');
+        nameEl.className   = 'cover-name';
+        nameEl.textContent = plainTitle;
+        nameEl.title       = plainTitle;
+
+        const dlBtn = document.createElement('button');
+        dlBtn.className   = 'btn-dl';
+        dlBtn.textContent = '⬇ Download';
+        dlBtn.onclick     = () => downloadCanvas(canvas, filename);
+
+        meta.appendChild(numEl);
+        meta.appendChild(nameEl);
+        footer.appendChild(meta);
+        footer.appendChild(dlBtn);
+        card.appendChild(footer);
+        document.getElementById('covers').appendChild(card);
+
+        setProgress(Math.round(((i + 1) / titles.length) * 100));
+    }
+
+    document.getElementById('output-section').style.display = 'block';
+    document.getElementById('output-title').textContent     = `${titles.length} Cover Siap`;
+    setStatus(`✓ ${titles.length} cover berhasil dibuat.`);
+    setProgress(0);
+    btn.disabled = false;
+}
+
+async function downloadAll() {
+    for (let i = 0; i < generatedCovers.length; i++) {
+        const { canvas, filename } = generatedCovers[i];
+        const ok = downloadCanvas(canvas, filename);
+        if (!ok) break;
+        if (i < generatedCovers.length - 1) await new Promise(r => setTimeout(r, 200));
+    }
+}
+</script>
+</body>
+</html>
