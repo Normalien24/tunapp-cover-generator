@@ -2,7 +2,7 @@
 
 Generate iOS-emoji blog covers for Tunapp — 740 × 480 px.
 
-**Live:** https://rzlfcman.github.io/tunapp-cover-generator/
+**Live:** https://Normalien24.github.io/tunapp-cover-generator/
 
 ## Cara pakai
 
