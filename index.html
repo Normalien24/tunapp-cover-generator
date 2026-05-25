@@ -268,8 +268,8 @@ const IS_HTTPS = window.location.protocol.startsWith('https');
 
 // HTTPS → crossOrigin aktif → canvas tidak tainted → download berfungsi penuh
 // file:// → tanpa crossOrigin → preview bisa, download via klik kanan
+const TWEMOJI_SVG = 'https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/';
 const APPLE_CDN   = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.1/img/apple/64/';
-const TWEMOJI_CDN = 'https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/72x72/';
 
 let generatedCovers = [];
 
@@ -297,7 +297,7 @@ function emojiToPath(emoji) {
     return [...emoji].map(c => c.codePointAt(0).toString(16)).join('-');
 }
 
-/* ── Image loader ── */
+/* ── PNG loader ── */
 function loadImg(url, cors = false) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -308,27 +308,54 @@ function loadImg(url, cors = false) {
     });
 }
 
-async function getEmojiImg(emoji) {
-    const path  = emojiToPath(emoji);
-    const noVar = path.replace(/-fe0f/g, '');
+/* ── SVG loader via fetch → blob URL (tidak taint canvas, crisp di semua ukuran) ── */
+async function fetchSVGEmoji(svgUrl, size) {
+    const resp = await fetch(svgUrl);
+    if (!resp.ok) throw new Error('svg not found');
+    let svg = await resp.text();
 
-    // Dari HTTPS: pakai crossOrigin agar canvas tidak tainted → download berfungsi
-    // Dari file://: tanpa crossOrigin agar gambar bisa load
-    const cors = IS_HTTPS;
-
-    const candidates = [
-        APPLE_CDN   + path   + '.png',
-        ...(noVar !== path ? [APPLE_CDN + noVar + '.png'] : []),
-        TWEMOJI_CDN + path   + '.png',
-        ...(noVar !== path ? [TWEMOJI_CDN + noVar + '.png'] : []),
-    ];
-
-    for (const url of candidates) {
-        try { return await loadImg(url, cors); } catch {}
+    // Set dimensi eksplisit agar browser render di ukuran yang tepat
+    svg = svg
+        .replace(/\bwidth="[^"]*"/, `width="${size}"`)
+        .replace(/\bheight="[^"]*"/, `height="${size}"`);
+    // Jika tidak ada width/height, injeksi ke tag <svg>
+    if (!svg.includes(`width="${size}"`)) {
+        svg = svg.replace('<svg ', `<svg width="${size}" height="${size}" `);
     }
 
-    // Final fallback: system font (Segoe UI Emoji / Apple Color Emoji)
-    return null;
+    const blob   = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const objUrl = URL.createObjectURL(blob);
+    return new Promise((resolve, reject) => {
+        const img = new Image(size, size);
+        img.onload  = () => { URL.revokeObjectURL(objUrl); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(objUrl); reject(); };
+        img.src     = objUrl;
+    });
+}
+
+/* ── Ambil gambar emoji terbaik berdasarkan environment ── */
+async function getEmojiImg(emoji, size) {
+    const path  = emojiToPath(emoji);
+    const noVar = path.replace(/-fe0f/g, '');
+    const alts  = [path, ...(noVar !== path ? [noVar] : [])];
+
+    if (IS_HTTPS) {
+        // HTTPS → Twemoji SVG via fetch → blob URL → crisp sempurna, download OK
+        for (const p of alts) {
+            try { return await fetchSVGEmoji(TWEMOJI_SVG + p + '.svg', size); } catch {}
+        }
+        // Fallback: Apple PNG dengan crossOrigin (canvas tidak tainted di HTTPS)
+        for (const p of alts) {
+            try { return await loadImg(APPLE_CDN + p + '.png', true); } catch {}
+        }
+    } else {
+        // file:// → Apple PNG tanpa crossOrigin (gambar load, download via klik kanan)
+        for (const p of alts) {
+            try { return await loadImg(APPLE_CDN + p + '.png', false); } catch {}
+        }
+    }
+
+    return null; // → system font fallback di buildCanvas
 }
 
 /* ── Layout (ukuran logical, akan di-scale di canvas) ── */
@@ -376,7 +403,7 @@ async function buildCanvas(title, bgColor) {
     const x0     = Math.round((W - totalW) / 2);
     const y0     = Math.round((H - size)   / 2);
 
-    const imgs = await Promise.all(emojiChars.map(getEmojiImg));
+    const imgs = await Promise.all(emojiChars.map(e => getEmojiImg(e, size)));
 
     for (let i = 0; i < n; i++) {
         const x = x0 + i * (size + gap);
